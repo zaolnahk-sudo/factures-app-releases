@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espace comptable</title>
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    --bg: #f5f7fa; --surface: #ffffff; --text: #17212b; --muted: #5d6b79; --line: #e3e8ee;
+    --accent: #1f4e79; --accent-soft: #e3edf6; --pos: #1e8a57; --neg: #b83227; --warn: #c7771a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1419; --surface: #182029; --text: #e6edf3; --muted: #93a1ae; --line: #2a3643;
+      --accent: #8bbbe6; --accent-soft: #1c3147; --pos: #5fd19a; --neg: #ff7b6e; --warn: #f0ad4e; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--surface); border-bottom: 1px solid var(--line); padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; min-width: 160px; }
+  main { max-width: 1180px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  input, select, textarea { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+  textarea { width: 100%; min-height: 90px; }
+  button { font: inherit; border: 0; border-radius: 8px; padding: 9px 14px; background: var(--accent); color: #fff; cursor: pointer; }
+  @media (prefers-color-scheme: dark) { button { color: #0f1419; } }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  button.link { background: none; color: var(--accent); padding: 4px 6px; }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
+  .tabs button { background: transparent; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+  .tabs button.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .grow { flex: 1; min-width: 180px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .02em; }
+  td.num, th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+  .pos { color: var(--pos); } .neg { color: var(--neg); } .warn { color: var(--warn); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .kpi .v { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .hidden { display: none !important; }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); width: min(520px, 92vw); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  .auth { max-width: 420px; margin: 40px auto; }
+  .auth input { width: 100%; margin-bottom: 10px; }
+  .comment { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .comment.done { opacity: .55; }
+  .err { color: var(--neg); font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Espace comptable</h1>
+  <select id="company" class="hidden" aria-label="Société"></select>
+  <span id="who" class="muted"></span>
+  <button id="logout" class="ghost hidden">Déconnexion</button>
+</header>
+<main>
+  <div id="noconfig" class="card hidden">
+    <b>Lien incomplet.</b>
+    <p class="muted">Ouvrez le lien d'invitation reçu (il contient l'adresse de l'espace). Si vous l'avez déjà utilisé sur cet appareil, rechargez simplement la page.</p>
+  </div>
+
+  <div id="auth" class="card auth hidden">
+    <h2 style="margin-top:0" id="authTitle">Connexion</h2>
+    <p class="muted" id="authHint">Utilisez l'adresse e-mail à laquelle vous avez été invité.</p>
+    <input id="email" type="email" placeholder="E-mail" autocomplete="email">
+    <input id="password" type="password" placeholder="Mot de passe" autocomplete="current-password">
+    <div class="row">
+      <button id="loginBtn">Se connecter</button>
+      <button id="signupBtn" class="ghost">Créer mon compte</button>
+      <button id="forgotBtn" class="link">Mot de passe oublié</button>
+    </div>
+    <p id="authMsg" class="muted"></p>
+  </div>
+
+  <div id="recover" class="card auth hidden">
+    <h2 style="margin-top:0">Nouveau mot de passe</h2>
+    <input id="newpass" type="password" placeholder="Nouveau mot de passe (6 caractères min.)" autocomplete="new-password">
+    <button id="setPassBtn">Enregistrer</button>
+    <p id="recoverMsg" class="muted"></p>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="tabs" id="tabs"></div>
+    <div class="card row" id="filters">
+      <label class="muted">Année <select id="year"></select></label>
+      <label class="muted">Période <select id="period"></select></label>
+      <input id="search" class="grow" type="search" placeholder="Rechercher (nom, n°, montant…)">
+      <button id="csvBtn" class="ghost">Exporter CSV</button>
+    </div>
+    <div id="view"></div>
+    <p class="muted" id="synced"></p>
+  </div>
+</main>
+
+<dialog id="commentDlg">
+  <form method="dialog">
+    <h3 style="margin-top:0">Commentaire</h3>
+    <p class="muted" id="commentTarget"></p>
+    <textarea id="commentBody" placeholder="Question, pièce manquante, correction…"></textarea>
+    <div class="row" style="margin-top:10px; justify-content:flex-end">
+      <button value="cancel" class="ghost">Annuler</button>
+      <button id="commentSend" value="default">Envoyer</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const show = (el, on) => el.classList.toggle("hidden", !on);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const eur = (cents) => (Number(cents || 0) / 100).toLocaleString("fr-BE", { style: "currency", currency: "EUR" });
+  const d = (iso) => iso ? iso.split("-").reverse().join("/") : "";
+  const KIND = { INVOICE: "Facture", RECEIPT: "Ticket", CREDIT_NOTE: "Note de crédit", QUOTE: "Devis", EXPENSE_REPORT: "Note de frais" };
+  const MONTHS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+
+  // Configuration du projet : dans le lien d'invitation, puis mémorisée sur l'appareil
+  const qs = new URLSearchParams(location.search);
+  let url = qs.get("u"), key = qs.get("k");
+  try {
+    if (url && key) localStorage.setItem("factures-cfg", JSON.stringify({ url, key }));
+    else { const c = JSON.parse(localStorage.getItem("factures-cfg") || "null"); if (c) { url = c.url; key = c.key; } }
+  } catch (e) { /* stockage indisponible : on garde les paramètres de l'URL */ }
+  if (!url || !key) { show($("noconfig"), true); return; }
+
+  const sb = supabase.createClient(url, key);
+  const state = { companies: [], company: null, data: {}, comments: [], tab: "synthese", rows: [], csv: null };
+
+  // ---------------------------------------------------------------- Authentification
+  const msg = (t, err) => { $("authMsg").textContent = t; $("authMsg").className = err ? "err" : "muted"; };
+  $("loginBtn").onclick = async () => {
+    const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+    if (error) msg(error.message === "Invalid login credentials" ? "E-mail ou mot de passe incorrect." : error.message, true);
+  };
+  $("signupBtn").onclick = async () => {
+    const { data, error } = await sb.auth.signUp({ email: $("email").value.trim(), password: $("password").value, options: { emailRedirectTo: location.origin + location.pathname } });
+    if (error) return msg(error.message, true);
+    msg(data.session ? "Compte créé." : "Compte créé : confirmez via le lien reçu par e-mail, puis connectez-vous ici.");
+  };
+  $("forgotBtn").onclick = async () => {
+    const email = $("email").value.trim();
+    if (!email) return msg("Indiquez votre e-mail.", true);
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+    msg(error ? error.message : "E-mail de réinitialisation envoyé.", !!error);
+  };
+  $("setPassBtn").onclick = async () => {
+    const { error } = await sb.auth.updateUser({ password: $("newpass").value });
+    $("recoverMsg").textContent = error ? error.message : "Mot de passe enregistré.";
+    if (!error) { show($("recover"), false); start(); }
+  };
+  $("logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+  sb.auth.onAuthStateChange((event) => {
+    if (event === "PASSWORD_RECOVERY") { show($("auth"), false); show($("app"), false); show($("recover"), true); }
+  });
+
+  async function start() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { show($("auth"), true); show($("app"), false); return; }
+    show($("auth"), false);
+    $("who").textContent = session.user.email;
+    show($("logout"), true);
+    const { data: companies, error } = await sb.from("companies").select("id,name").order("name");
+    if (error) { $("view").innerHTML = `<div class="card err">${esc(error.message)}</div>`; show($("app"), true); return; }
+    state.companies = companies || [];
+    if (!state.companies.length) {
+      show($("app"), true);
+      $("view").innerHTML = `<div class="card">Aucune société partagée avec <b>${esc(session.user.email)}</b> pour l'instant. Demandez à votre client de vous inviter avec cette adresse.</div>`;
+      show($("filters"), false);
+      return;
+    }
+    const sel = $("company");
+    sel.innerHTML = state.companies.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+    show(sel, state.companies.length > 1);
+    sel.onchange = () => load(sel.value);
+    await load(state.companies[0].id);
+  }
+
+  // ---------------------------------------------------------------- Données
+  async function load(companyId) {
+    state.company = state.companies.find((c) => c.id === companyId);
+    $("title").textContent = state.company.name;
+    const { data: sets } = await sb.from("datasets").select("name,data,updated_at").eq("company_id", companyId);
+    state.data = {};
+    (sets || []).forEach((s) => { state.data[s.name] = s.data; });
+    await loadComments();
+    const meta = state.data.meta || {};
+    $("synced").textContent = meta.syncedAt ? "Données publiées le " + new Date(meta.syncedAt).toLocaleString("fr-BE") : "Pas encore de données publiées.";
+    fillFilters();
+    show($("app"), true);
+    render();
+  }
+  async function loadComments() {
+    const { data } = await sb.from("comments").select("*").eq("company_id", state.company.id).order("id", { ascending: false });
+    state.comments = data || [];
+  }
+
+  function fillFilters() {
+    const years = new Set();
+    (state.data.invoices || []).forEach((i) => i.date && years.add(+i.date.slice(0, 4)));
+    (state.data.bank || []).forEach((t) => t.date && years.add(+t.date.slice(0, 4)));
+    years.add(new Date().getFullYear());
+    const ys = [...years].sort((a, b) => b - a);
+    $("year").innerHTML = ys.map((y) => `<option>${y}</option>`).join("");
+    const monthly = !!(state.data.meta || {}).monthly;
+    const opts = [["all", "Toute l'année"], ["Q1", "T1"], ["Q2", "T2"], ["Q3", "T3"], ["Q4", "T4"]]
+      .concat(MONTHS.map((m, i) => ["M" + (i + 1), m]));
+    $("period").innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    // Par défaut : période TVA qui vient de se terminer
+    const now = new Date();
+    if (monthly) { const m = now.getMonth() === 0 ? 12 : now.getMonth(); $("period").value = "M" + m; if (now.getMonth() === 0) $("year").value = now.getFullYear() - 1; }
+    else { const q = Math.floor(now.getMonth() / 3); $("period").value = q === 0 ? "Q4" : "Q" + q; if (q === 0) $("year").value = now.getFullYear() - 1; }
+  }
+  function inPeriod(iso) {
+    if (!iso) return false;
+    const y = +iso.slice(0, 4), m = +iso.slice(5, 7), p = $("period").value;
+    if (y !== +$("year").value) return false;
+    if (p === "all") return true;
+    if (p[0] === "Q") return Math.ceil(m / 3) === +p.slice(1);
+    return m === +p.slice(1);
+  }
+  const q = () => $("search").value.trim().toLowerCase();
+  const match = (...vals) => !q() || vals.some((v) => String(v ?? "").toLowerCase().includes(q()));
+
+  // ---------------------------------------------------------------- Rendu
+  const TABS = [["synthese", "Synthèse"], ["achats", "Achats"], ["ventes", "Ventes"], ["banque", "Banque"], ["tva", "TVA"], ["documents", "Documents"], ["commentaires", "Commentaires"]];
+  function renderTabs() {
+    const open = state.comments.filter((c) => !c.resolved).length;
+    $("tabs").innerHTML = TABS.map(([k, l]) => `<button data-t="${k}" class="${state.tab === k ? "on" : ""}">${l}${k === "commentaires" && open ? " (" + open + ")" : ""}</button>`).join("");
+    $("tabs").querySelectorAll("button").forEach((b) => b.onclick = () => { state.tab = b.dataset.t; render(); });
+  }
+  function render() {
+    renderTabs();
+    show($("filters"), !["commentaires"].includes(state.tab));
+    const v = $("view");
+    state.csv = null;
+    const f = { synthese, achats: () => invoices("PURCHASE"), ventes: () => invoices("SALE"), banque, tva, documents, commentaires }[state.tab];
+    v.innerHTML = f();
+    v.querySelectorAll("[data-file]").forEach((b) => b.onclick = () => openFile(b.dataset.file));
+    v.querySelectorAll("[data-comment]").forEach((b) => b.onclick = () => askComment(b.dataset.comment, b.dataset.label));
+    const nc = v.querySelector("#newComment");
+    if (nc) nc.onclick = () => askComment("", "Général");
+  }
+  ["year", "period"].forEach((id) => $(id).onchange = render);
+  $("search").oninput = render;
+
+  function synthese() {
+    const inv = (state.data.invoices || []).filter((i) => inPeriod(i.date) && i.status === "FINAL" && i.kind !== "QUOTE" && i.kind !== "EXPENSE_REPORT");
+    const sign = (i) => i.kind === "CREDIT_NOTE" ? -1 : 1;
+    const sales = inv.filter((i) => i.direction === "SALE"), buys = inv.filter((i) => i.direction === "PURCHASE");
+    const bank = (state.data.bank || []).filter((t) => inPeriod(t.date));
+    const todo = bank.filter((t) => t.status === "à justifier");
+    const unreviewed = buys.filter((i) => !i.reviewed).length;
+    const noFile = buys.filter((i) => !i.file).length;
+    const k = (l, v, cls) => `<div class="card kpi"><div class="muted">${l}</div><div class="v ${cls || ""}">${v}</div></div>`;
+    return `<div class="kpis">
+      ${k("Ventes HTVA", eur(sales.reduce((s, i) => s + sign(i) * i.excl, 0)))}
+      ${k("Achats HTVA", eur(buys.reduce((s, i) => s + sign(i) * i.excl, 0)))}
+      ${k("Mouvements à justifier", todo.length, todo.length ? "warn" : "pos")}
+      ${k("Achats sans pièce", noFile, noFile ? "warn" : "pos")}
+      ${k("Pièces non vérifiées", unreviewed, unreviewed ? "warn" : "pos")}
+      ${k("Commentaires ouverts", state.comments.filter((c) => !c.resolved).length)}
+    </div>
+    ${todo.length ? `<div class="card"><b>Mouvements sans justificatif</b>${bankTable(todo)}</div>` : ""}
+    <div class="card muted">Période clôturée jusqu'au : ${d((state.data.meta || {}).closedUntil) || "—"} · TVA ${(state.data.meta || {}).monthly ? "mensuelle" : "trimestrielle"}</div>`;
+  }
+
+  function invoices(dir) {
+    const list = (state.data.invoices || []).filter((i) => i.direction === dir && inPeriod(i.date) && match(i.party, i.number, i.category, i.description, (i.incl / 100).toFixed(2)))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const sign = (i) => i.kind === "CREDIT_NOTE" ? -1 : 1;
+    const real = list.filter((i) => i.kind !== "QUOTE" && i.kind !== "EXPENSE_REPORT" && i.status === "FINAL");
+    state.csv = [["Date", "Type", "N°", dir === "SALE" ? "Client" : "Fournisseur", "N° TVA", "Catégorie", "HTVA", "TVA", "TVAC", "Payé", "Privé", "Fichier"]]
+      .concat(list.map((i) => [d(i.date), KIND[i.kind] || i.kind, i.number, i.party, i.partyVat, i.category, (i.excl / 100).toFixed(2), (i.vat / 100).toFixed(2), (i.incl / 100).toFixed(2), i.isPaid ? "oui" : "non", i.private ? "oui" : "", i.file ? "oui" : ""]));
+    const rows = list.map((i) => `<tr>
+      <td>${d(i.date)}</td>
+      <td><span class="pill">${esc(KIND[i.kind] || i.kind)}</span>${i.status === "DRAFT" ? ' <span class="muted">brouillon</span>' : ""}${i.reviewed === false ? ' <span class="warn">à vérifier</span>' : ""}</td>
+      <td>${esc(i.party)}<div class="muted">${esc(i.number)} ${esc(i.partyVat)}</div></td>
+      <td>${esc(i.category)}${i.private ? '<div class="muted">payé en privé</div>' : ""}</td>
+      <td class="num">${eur(i.excl)}</td><td class="num">${eur(i.vat)}</td><td class="num"><b>${eur(i.incl)}</b></td>
+      <td>${i.isPaid ? '<span class="pos">payé</span>' : '<span class="warn">ouvert</span>'}</td>
+      <td class="num">${i.file ? `<button class="link" data-file="${esc(i.file)}">Pièce</button>` : '<span class="warn">sans pièce</span>'}
+        <button class="link" data-comment="invoice:${i.id}" data-label="${esc((KIND[i.kind] || "") + " " + i.party + " " + i.number)}">💬</button></td>
+    </tr>`).join("");
+    const tot = (f) => real.reduce((s, i) => s + sign(i) * i[f], 0);
+    return `<div class="card table-wrap"><table>
+      <thead><tr><th>Date</th><th>Type</th><th>${dir === "SALE" ? "Client" : "Fournisseur"}</th><th>Catégorie</th><th class="num">HTVA</th><th class="num">TVA</th><th class="num">TVAC</th><th>Statut</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="9" class="muted">Aucune pièce sur la période.</td></tr>`}</tbody>
+      <tfoot><tr><th colspan="4">Total (hors devis, brouillons, notes de frais)</th><th class="num">${eur(tot("excl"))}</th><th class="num">${eur(tot("vat"))}</th><th class="num">${eur(tot("incl"))}</th><th colspan="2"></th></tr></tfoot>
+    </table></div>`;
+  }
+
+  function bankTable(list) {
+    const byId = Object.fromEntries((state.data.invoices || []).map((i) => [i.id, i]));
+    return `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Contrepartie</th><th>Communication</th><th class="num">Montant</th><th>Statut</th><th>Pièces</th><th></th></tr></thead><tbody>` +
+      list.map((t) => `<tr><td>${d(t.date)}</td><td>${esc(t.party)}<div class="muted">${esc(t.iban)}</div></td><td class="muted">${esc(t.comm)}</td>
+        <td class="num ${t.amount < 0 ? "neg" : "pos"}">${eur(t.amount)}</td>
+        <td>${t.status === "rapproché" ? '<span class="pos">rapproché</span>' : t.status === "à justifier" ? '<span class="warn">à justifier</span>' : esc(t.status)}</td>
+        <td>${(t.invoices || []).map((id) => byId[id]).filter(Boolean).map((i) => i.file ? `<button class="link" data-file="${esc(i.file)}">${esc(i.number || i.party)}</button>` : esc(i.number || i.party)).join(", ")}</td>
+        <td><button class="link" data-comment="tx:${t.id}" data-label="${esc("Mouvement " + d(t.date) + " " + t.party + " " + (t.amount / 100).toFixed(2))}">💬</button></td></tr>`).join("") +
+      `</tbody></table></div>`;
+  }
+  function banque() {
+    const list = (state.data.bank || []).filter((t) => inPeriod(t.date) && match(t.party, t.comm, (t.amount / 100).toFixed(2))).sort((a, b) => a.date.localeCompare(b.date));
+    state.csv = [["Date", "Contrepartie", "IBAN", "Communication", "Montant", "Statut", "Compte"]]
+      .concat(list.map((t) => [d(t.date), t.party, t.iban, t.comm, (t.amount / 100).toFixed(2), t.status, t.account]));
+    return `<div class="card">${list.length ? bankTable(list) : '<p class="muted">Aucun mouvement sur la période.</p>'}</div>`;
+  }
+
+  const GRID = { "00": "Opérations à 0 %", "01": "Opérations à 6 %", "02": "Opérations à 12 %", "03": "Opérations à 21 %", "44": "Services intra-UE", "47": "Hors UE",
+    "49": "Notes de crédit émises", "54": "TVA due", "55": "TVA intra-UE", "56": "TVA autoliquidation hors UE", "59": "TVA déductible", "63": "TVA à reverser",
+    "64": "TVA à récupérer", "81": "Marchandises", "82": "Services et biens divers", "83": "Investissements", "85": "Notes de crédit reçues",
+    "86": "Acquisitions intra-UE biens", "87": "Autres (autoliquidation)", "88": "Services intra-UE reçus", "71": "À payer", "72": "À récupérer" };
+  function tva() {
+    const y = +$("year").value;
+    const periods = (state.data.vat || []).filter((p) => p.year === y);
+    if (!periods.length) return `<div class="card muted">Pas de données TVA pour ${y}.</div>`;
+    state.csv = [["Période", "Grille", "Libellé", "Montant"]];
+    return periods.map((p) => {
+      const g = p.grids || {};
+      Object.keys(g).sort().forEach((k) => state.csv.push([p.label + " " + y, k, GRID[k] || "", (g[k] / 100).toFixed(2)]));
+      const bal = (g["71"] || 0) - (g["72"] || 0);
+      return `<div class="card"><div class="row"><b class="grow">${esc(p.label)} ${y}</b>
+        <span class="${bal > 0 ? "neg" : "pos"}"><b>${bal > 0 ? "À payer " + eur(bal) : bal < 0 ? "À récupérer " + eur(-bal) : "Solde nul"}</b></span>
+        <span class="muted">échéance ${d(p.deadline)}</span>
+        <button class="link" data-comment="vat:${esc(p.label)}-${y}" data-label="TVA ${esc(p.label)} ${y}">💬</button></div>
+        <div class="table-wrap"><table><tbody>${Object.keys(g).filter((k) => k !== "71" && k !== "72").sort().map((k) => `<tr><td style="width:50px"><b>${k}</b></td><td>${GRID[k] || ""}</td><td class="num">${eur(g[k])}</td></tr>`).join("")}</tbody></table></div></div>`;
+    }).join("");
+  }
+
+  function documents() {
+    const list = (state.data.documents || []).filter((x) => inPeriod(x.date) && match(x.title, x.type, x.note));
+    state.csv = [["Date", "Type", "Titre", "Note"]].concat(list.map((x) => [d(x.date), x.type, x.title, x.note]));
+    return `<div class="card table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Titre</th><th></th></tr></thead><tbody>` +
+      (list.map((x) => `<tr><td>${d(x.date)}</td><td><span class="pill">${esc(x.type)}</span></td><td>${esc(x.title)}<div class="muted">${esc(x.note)}</div></td>
+        <td class="num">${x.file ? `<button class="link" data-file="${esc(x.file)}">Ouvrir</button>` : ""}<button class="link" data-comment="doc:${x.id}" data-label="${esc(x.title)}">💬</button></td></tr>`).join("")
+        || `<tr><td colspan="4" class="muted">Aucun document sur la période.</td></tr>`) + `</tbody></table></div>`;
+  }
+
+  function commentaires() {
+    return `<div class="card"><div class="row"><b class="grow">Échanges avec ${esc(state.company.name)}</b><button id="newComment">Nouveau commentaire</button></div>
+      ${state.comments.map((c) => `<div class="comment ${c.resolved ? "done" : ""}"><div class="muted">${esc(c.target_label || "Général")} · ${esc(c.author)} · ${new Date(c.created_at).toLocaleString("fr-BE")}${c.resolved ? " · résolu" : ""}</div><div>${esc(c.body).replace(/\n/g, "<br>")}</div></div>`).join("") || '<p class="muted">Aucun commentaire.</p>'}</div>`;
+  }
+
+  // ---------------------------------------------------------------- Actions
+  async function openFile(path) {
+    const w = window.open("", "_blank");
+    const { data, error } = await sb.storage.from("pieces").createSignedUrl(path, 120);
+    if (error) { if (w) w.close(); alert("Fichier indisponible : " + error.message); return; }
+    if (w) w.location = data.signedUrl; else location.href = data.signedUrl;
+  }
+  let pendingTarget = null;
+  function askComment(target, label) {
+    pendingTarget = { target, label };
+    $("commentTarget").textContent = label;
+    $("commentBody").value = "";
+    $("commentDlg").showModal();
+  }
+  $("commentDlg").addEventListener("close", async () => {
+    if ($("commentDlg").returnValue !== "default" || !pendingTarget) return;
+    const body = $("commentBody").value.trim();
+    if (!body) return;
+    const { data: { session } } = await sb.auth.getSession();
+    const { error } = await sb.from("comments").insert({ company_id: state.company.id, target: pendingTarget.target, target_label: pendingTarget.label, body, author: session.user.email });
+    if (error) { alert(error.message); return; }
+    await loadComments();
+    render();
+  });
+  $("csvBtn").onclick = () => {
+    if (!state.csv) return;
+    const text = "﻿" + state.csv.map((r) => r.map((c) => { const s = String(c ?? ""); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(";")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+    a.download = `${state.company.name}-${state.tab}-${$("year").value}-${$("period").value}.csv`.replace(/[^\w.-]+/g, "_");
+    a.click();
+  };
+
+  start();
+})();
+</script>
+</body>
+</html>
