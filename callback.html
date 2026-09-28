@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retour vers Factures</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #f7f8fa; color: #1b2430; margin: 0; padding: 48px 20px; text-align: center; }
+  a.btn { display: inline-block; margin-top: 24px; padding: 16px 28px; background: #1F4E79; color: #fff; border-radius: 12px; text-decoration: none; font-weight: 600; }
+  p { color: #555; }
+</style>
+</head>
+<body>
+<h2>Connexion bancaire terminée</h2>
+<p>Retour vers l'application Factures…</p>
+<a class="btn" id="go" href="#">Ouvrir Factures</a>
+<script>
+  // Transmet code/state (ou l'erreur) reçus de la banque à l'app Android.
+  var q = window.location.search || "";
+  var intentUrl = "intent://bank" + q + "#Intent;scheme=factures;package=com.nco.factures;end";
+  document.getElementById("go").href = intentUrl;
+  window.location.replace(intentUrl);
+</script>
+</body>
+</html>
